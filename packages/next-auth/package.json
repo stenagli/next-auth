@@ -1,15 +1,16 @@
 {
-  "name": "next-auth",
-  "version": "5.0.0-beta.19",
+  "name": "@stenagli/next-auth",
+  "version": "5.0.0-beta.19-stenagli.0.1.0",
   "description": "Authentication for Next.js",
   "homepage": "https://nextjs.authjs.dev",
-  "repository": "https://github.com/nextauthjs/next-auth.git",
+  "repository": "https://github.com/stenagli/next-auth.git",
   "author": "Balázs Orbán <info@balazsorban.com>",
   "contributors": [
     "Iain Collins <me@iaincollins.com>",
     "Nico Domino <yo@ndo.dev>",
     "Lluis Agusti <hi@llu.lu>",
-    "Thang Huu Vu <hi@thvu.dev>"
+    "Thang Huu Vu <hi@thvu.dev>",
+    "Steven Tenaglia <steven.a.tenaglia@gmail.com>"
   ],
   "type": "module",
   "exports": {

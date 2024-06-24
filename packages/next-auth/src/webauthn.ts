@@ -1,5 +1,5 @@
 import { apiBaseUrl } from "./lib/client.js"
-import { startAuthentication, startRegistration } from "@simplewebauthn/browser"
+import { startAuthentication, startRegistration, browserSupportsWebAuthnAutofill } from "@simplewebauthn/browser"
 import { getCsrfToken, getProviders, __NEXTAUTH } from "./react.js"
 
 import type { LoggerInstance } from "@auth/core/types"
@@ -160,4 +160,44 @@ export async function signIn<
     ok: res.ok,
     url: error ? null : data.url,
   } as any
+}
+
+/**
+ * Handles CSRF protection.
+ */
+export async function enableWebAuthnAutofillIfSupported() {
+  if (!browserSupportsWebAuthnAutofill()) return
+
+  const params = new URLSearchParams({ action: 'authenticate' })
+  const optionsResp = await fetch(
+    `${apiBaseUrl(__NEXTAUTH)}/webauthn-options/passkey?${params}`
+  )
+  if (!optionsResp.ok) {
+    logger.error(new Error(await optionsResp.text()))
+    return
+  }
+  const optionsData = await optionsResp.json()
+
+  const webAuthnResponse = await startAuthentication(optionsData.options, true)
+
+  const callbackUrl = window.location.href
+  const res = await fetch(
+    `${apiBaseUrl(__NEXTAUTH)}/callback/passkey`,
+    {
+      method: "post",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Auth-Return-Redirect": "1",
+      },
+      body: new URLSearchParams({
+        data: JSON.stringify(webAuthnResponse),
+        action: 'authenticate',
+        csrfToken: await getCsrfToken(),
+        callbackUrl
+      }),
+    }
+  )
+  const authData = await res.json()
+
+  window.location.href = authData.url ?? callbackUrl
 }
