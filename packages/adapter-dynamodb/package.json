@@ -52,6 +52,6 @@
     "@aws-sdk/lib-dynamodb": "^3.36.1"
   },
   "dependencies": {
-    "@auth/core": "workspace:*"
+    "@auth/core": "0.34.1"
   }
 }
