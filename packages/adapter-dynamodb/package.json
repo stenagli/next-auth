@@ -1,7 +1,7 @@
 {
-  "name": "@auth/dynamodb-adapter",
-  "repository": "https://github.com/nextauthjs/next-auth",
-  "version": "2.2.0",
+  "name": "@stenagli/dynamodb-adapter",
+  "repository": "https://github.com/stenagli/next-auth",
+  "version": "2.3.0",
   "description": "AWS DynamoDB adapter for next-auth.",
   "keywords": [
     "next-auth",
@@ -26,7 +26,8 @@
   },
   "author": "Pol Marnette",
   "contributors": [
-    "Balázs Orbán <info@balazsorban.com>"
+    "Balázs Orbán <info@balazsorban.com>",
+    "Steven Tenaglia <steven.a.tenaglia@gmail.com>"
   ],
   "license": "ISC",
   "type": "module",
