@@ -1,6 +1,6 @@
 {
   "name": "@stenagli/next-auth",
-  "version": "5.0.0-beta.19-stenagli.0.1.0",
+  "version": "5.0.0-beta.19-stenagli.0.1.1",
   "description": "Authentication for Next.js",
   "homepage": "https://nextjs.authjs.dev",
   "repository": "https://github.com/stenagli/next-auth.git",
@@ -79,7 +79,7 @@
   ],
   "license": "ISC",
   "dependencies": {
-    "@auth/core": "workspace:*"
+    "@auth/core": "^0.34.1"
   },
   "peerDependencies": {
     "@simplewebauthn/browser": "^9.0.1",
