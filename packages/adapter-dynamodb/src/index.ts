@@ -25,6 +25,7 @@ import {
   type AdapterAccount,
   type AdapterUser,
   type VerificationToken,
+  type AdapterAuthenticator,
   isDate,
 } from "@auth/core/adapters"
 
@@ -341,6 +342,102 @@ export function DynamoDBAdapter(
         ReturnValues: "ALL_OLD",
       })
       return format.from<VerificationToken>(data.Attributes)
+    },
+    async getAccount(providerAccountId, provider) {
+      const data = await client.query({
+        TableName,
+        IndexName,
+        KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
+        ExpressionAttributeNames: {
+          "#gsi1pk": GSI1PK,
+          "#gsi1sk": GSI1SK,
+        },
+        ExpressionAttributeValues: {
+          ":gsi1pk": `ACCOUNT#${provider}`,
+          ":gsi1sk": `ACCOUNT#${providerAccountId}`,
+        },
+      })
+      return format.from<AdapterAccount>(data.Items?.[0])
+    },
+    async createAuthenticator(authenticator) {
+      const { userId, credentialID } = authenticator;
+      await client.put({
+        TableName,
+        Item: format.to({
+          [pk]: `USER#${userId}`,
+          [sk]: `AUTHENTICATOR#${credentialID}`,
+          type: "AUTHENTICATOR",
+          [GSI1PK]: `AUTHENTICATOR#${credentialID}`,
+          [GSI1SK]: `AUTHENTICATOR#${credentialID}`,
+          ...authenticator,
+        }),
+      })
+      return authenticator
+    },
+    async getAuthenticator(credentialID) {
+      const data = await client.query({
+        TableName,
+        IndexName,
+        KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
+        ExpressionAttributeNames: {
+          "#gsi1pk": GSI1PK,
+          "#gsi1sk": GSI1SK,
+        },
+        ExpressionAttributeValues: {
+          ":gsi1pk": `AUTHENTICATOR#${credentialID}`,
+          ":gsi1sk": `AUTHENTICATOR#${credentialID}`,
+        },
+      })
+      return format.from<AdapterAuthenticator>(data.Items?.[0])
+    },
+    async listAuthenticatorsByUserId(userId) {
+      const data = await client.query({
+        TableName,
+        KeyConditionExpression: "#pk = :pk AND begins_with(#sk, :sk)",
+        ExpressionAttributeNames: {
+          "#pk": pk,
+          "#sk": sk,
+        },
+        ExpressionAttributeValues: {
+          ":pk": `USER#${userId}`,
+          ":sk": "AUTHENTICATOR#",
+        },
+      })
+      return (data.Items || []).map(item => format.from<AdapterAuthenticator>(item)) as AdapterAuthenticator[]
+    },
+    async updateAuthenticatorCounter(credentialID, counter) {
+      const data = await client.query({
+        TableName,
+        IndexName,
+        KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
+        ExpressionAttributeNames: {
+          "#gsi1pk": GSI1PK,
+          "#gsi1sk": GSI1SK,
+        },
+        ExpressionAttributeValues: {
+          ":gsi1pk": `AUTHENTICATOR#${credentialID}`,
+          ":gsi1sk": `AUTHENTICATOR#${credentialID}`,
+        },
+      })
+      const authenticatorRecord = data.Items?.[0]
+      if (!authenticatorRecord) throw new Error(`Cannot find Authenticator with credentialID ${credentialID}`)
+      const {
+        UpdateExpression,
+        ExpressionAttributeNames,
+        ExpressionAttributeValues,
+      } = generateUpdateExpression({ counter })
+      const res = await client.update({
+        TableName,
+        Key: {
+          [pk]: authenticatorRecord[pk],
+          [sk]: authenticatorRecord[sk],
+        },
+        UpdateExpression,
+        ExpressionAttributeNames,
+        ExpressionAttributeValues,
+        ReturnValues: "ALL_NEW",
+      })
+      return format.from<AdapterAuthenticator>(res.Attributes) as AdapterAuthenticator
     },
   }
 }
