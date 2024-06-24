@@ -1,7 +1,7 @@
 {
   "name": "@stenagli/dynamodb-adapter",
   "repository": "https://github.com/stenagli/next-auth",
-  "version": "2.2.0-stenagli.0.1.3",
+  "version": "2.4.1-stenagli.0.1.3",
   "description": "AWS DynamoDB adapter for next-auth.",
   "keywords": [
     "next-auth",
