@@ -17,7 +17,15 @@
 
 import type {
   BatchWriteCommandInput,
-  DynamoDBDocument,
+  DynamoDBDocumentClient,
+} from "@aws-sdk/lib-dynamodb"
+import {
+  PutCommand,
+  GetCommand,
+  QueryCommand,
+  UpdateCommand,
+  BatchWriteCommand,
+  DeleteCommand,
 } from "@aws-sdk/lib-dynamodb"
 import {
   type Adapter,
@@ -39,7 +47,7 @@ export interface DynamoDBAdapterOptions {
 }
 
 export function DynamoDBAdapter(
-  client: DynamoDBDocument,
+  client: DynamoDBDocumentClient,
   options?: DynamoDBAdapterOptions
 ): Adapter {
   const TableName = options?.tableName ?? "next-auth"
@@ -56,7 +64,7 @@ export function DynamoDBAdapter(
         id: crypto.randomUUID(),
       }
 
-      await client.put({
+      await client.send(new PutCommand({
         TableName,
         Item: format.to({
           ...user,
@@ -66,22 +74,22 @@ export function DynamoDBAdapter(
           [GSI1PK]: `USER#${user.email}`,
           [GSI1SK]: `USER#${user.email}`,
         }),
-      })
+      }))
 
       return user
     },
     async getUser(userId) {
-      const data = await client.get({
+      const data = await client.send(new GetCommand({
         TableName,
         Key: {
           [pk]: `USER#${userId}`,
           [sk]: `USER#${userId}`,
         },
-      })
+      }))
       return format.from<AdapterUser>(data.Item)
     },
     async getUserByEmail(email) {
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -93,12 +101,12 @@ export function DynamoDBAdapter(
           ":gsi1pk": `USER#${email}`,
           ":gsi1sk": `USER#${email}`,
         },
-      })
+      }))
 
       return format.from<AdapterUser>(data.Items?.[0])
     },
     async getUserByAccount({ provider, providerAccountId }) {
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -110,17 +118,17 @@ export function DynamoDBAdapter(
           ":gsi1pk": `ACCOUNT#${provider}`,
           ":gsi1sk": `ACCOUNT#${providerAccountId}`,
         },
-      })
+      }))
       if (!data.Items?.length) return null
 
       const accounts = data.Items[0] as AdapterAccount
-      const res = await client.get({
+      const res = await client.send(new GetCommand({
         TableName,
         Key: {
           [pk]: `USER#${accounts.userId}`,
           [sk]: `USER#${accounts.userId}`,
         },
-      })
+      }))
       return format.from<AdapterUser>(res.Item)
     },
     async updateUser(user) {
@@ -129,7 +137,7 @@ export function DynamoDBAdapter(
         ExpressionAttributeNames,
         ExpressionAttributeValues,
       } = generateUpdateExpression(user)
-      const data = await client.update({
+      const data = await client.send(new UpdateCommand({
         TableName,
         Key: {
           [pk]: `USER#${user.id}`,
@@ -139,19 +147,19 @@ export function DynamoDBAdapter(
         ExpressionAttributeNames,
         ExpressionAttributeValues,
         ReturnValues: "ALL_NEW",
-      })
+      }))
 
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       return format.from<AdapterUser>(data.Attributes)!
     },
     async deleteUser(userId) {
       // query all the items related to the user to delete
-      const res = await client.query({
+      const res = await client.send(new QueryCommand({
         TableName,
         KeyConditionExpression: "#pk = :pk",
         ExpressionAttributeNames: { "#pk": pk },
         ExpressionAttributeValues: { ":pk": `USER#${userId}` },
-      })
+      }))
       if (!res.Items) return null
       const items = res.Items
       // find the user we want to delete to return at the end of the function call
@@ -171,7 +179,7 @@ export function DynamoDBAdapter(
       const param: BatchWriteCommandInput = {
         RequestItems: { [TableName]: itemsToDeleteMax },
       }
-      await client.batchWrite(param)
+      await client.send(new BatchWriteCommand(param))
       return format.from<AdapterUser>(user)
     },
     async linkAccount(data) {
@@ -183,11 +191,11 @@ export function DynamoDBAdapter(
         [GSI1PK]: `ACCOUNT#${data.provider}`,
         [GSI1SK]: `ACCOUNT#${data.providerAccountId}`,
       }
-      await client.put({ TableName, Item: format.to(item) })
+      await client.send(new PutCommand({ TableName, Item: format.to(item) }))
       return data
     },
     async unlinkAccount({ provider, providerAccountId }) {
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -199,21 +207,21 @@ export function DynamoDBAdapter(
           ":gsi1pk": `ACCOUNT#${provider}`,
           ":gsi1sk": `ACCOUNT#${providerAccountId}`,
         },
-      })
+      }))
       const account = format.from<AdapterAccount>(data.Items?.[0])
       if (!account) return
-      await client.delete({
+      await client.send(new DeleteCommand({
         TableName,
         Key: {
           [pk]: `USER#${account.userId}`,
           [sk]: `ACCOUNT#${provider}#${providerAccountId}`,
         },
         ReturnValues: "ALL_OLD",
-      })
+      }))
       return account
     },
     async getSessionAndUser(sessionToken) {
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -225,16 +233,16 @@ export function DynamoDBAdapter(
           ":gsi1pk": `SESSION#${sessionToken}`,
           ":gsi1sk": `SESSION#${sessionToken}`,
         },
-      })
+      }))
       const session = format.from<AdapterSession>(data.Items?.[0])
       if (!session) return null
-      const res = await client.get({
+      const res = await client.send(new GetCommand({
         TableName,
         Key: {
           [pk]: `USER#${session.userId}`,
           [sk]: `USER#${session.userId}`,
         },
-      })
+      }))
       const user = format.from<AdapterUser>(res.Item)
       if (!user) return null
       return { user, session }
@@ -244,7 +252,7 @@ export function DynamoDBAdapter(
         id: crypto.randomUUID(),
         ...data,
       }
-      await client.put({
+      await client.send(new PutCommand({
         TableName,
         Item: format.to({
           [pk]: `USER#${data.userId}`,
@@ -254,12 +262,12 @@ export function DynamoDBAdapter(
           type: "SESSION",
           ...data,
         }),
-      })
+      }))
       return session
     },
     async updateSession(session) {
       const { sessionToken } = session
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -271,7 +279,7 @@ export function DynamoDBAdapter(
           ":gsi1pk": `SESSION#${sessionToken}`,
           ":gsi1sk": `SESSION#${sessionToken}`,
         },
-      })
+      }))
       if (!data.Items?.length) return null
       const sessionRecord = data.Items[0]
       const {
@@ -279,7 +287,7 @@ export function DynamoDBAdapter(
         ExpressionAttributeNames,
         ExpressionAttributeValues,
       } = generateUpdateExpression(session)
-      const res = await client.update({
+      const res = await client.send(new UpdateCommand({
         TableName,
         Key: {
           [pk]: sessionRecord[pk],
@@ -289,11 +297,11 @@ export function DynamoDBAdapter(
         ExpressionAttributeNames,
         ExpressionAttributeValues,
         ReturnValues: "ALL_NEW",
-      })
+      }))
       return format.from<AdapterSession>(res.Attributes)
     },
     async deleteSession(sessionToken) {
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -305,23 +313,23 @@ export function DynamoDBAdapter(
           ":gsi1pk": `SESSION#${sessionToken}`,
           ":gsi1sk": `SESSION#${sessionToken}`,
         },
-      })
+      }))
       if (!data?.Items?.length) return null
 
       const sessionRecord = data.Items[0]
 
-      const res = await client.delete({
+      const res = await client.send(new DeleteCommand({
         TableName,
         Key: {
           [pk]: sessionRecord[pk],
           [sk]: sessionRecord[sk],
         },
         ReturnValues: "ALL_OLD",
-      })
+      }))
       return format.from<AdapterSession>(res.Attributes)
     },
     async createVerificationToken(data) {
-      await client.put({
+      await client.send(new PutCommand({
         TableName,
         Item: format.to({
           [pk]: `VT#${data.identifier}`,
@@ -329,22 +337,22 @@ export function DynamoDBAdapter(
           type: "VT",
           ...data,
         }),
-      })
+      }))
       return data
     },
     async useVerificationToken({ identifier, token }) {
-      const data = await client.delete({
+      const data = await client.send(new DeleteCommand({
         TableName,
         Key: {
           [pk]: `VT#${identifier}`,
           [sk]: `VT#${token}`,
         },
         ReturnValues: "ALL_OLD",
-      })
+      }))
       return format.from<VerificationToken>(data.Attributes)
     },
     async getAccount(providerAccountId, provider) {
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -356,12 +364,12 @@ export function DynamoDBAdapter(
           ":gsi1pk": `ACCOUNT#${provider}`,
           ":gsi1sk": `ACCOUNT#${providerAccountId}`,
         },
-      })
+      }))
       return format.from<AdapterAccount>(data.Items?.[0])
     },
     async createAuthenticator(authenticator) {
       const { userId, credentialID } = authenticator;
-      await client.put({
+      await client.send(new PutCommand({
         TableName,
         Item: format.to({
           [pk]: `USER#${userId}`,
@@ -371,11 +379,11 @@ export function DynamoDBAdapter(
           [GSI1SK]: `AUTHENTICATOR#${credentialID}`,
           ...authenticator,
         }),
-      })
+      }))
       return authenticator
     },
     async getAuthenticator(credentialID) {
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -387,11 +395,11 @@ export function DynamoDBAdapter(
           ":gsi1pk": `AUTHENTICATOR#${credentialID}`,
           ":gsi1sk": `AUTHENTICATOR#${credentialID}`,
         },
-      })
+      }))
       return format.from<AdapterAuthenticator>(data.Items?.[0])
     },
     async listAuthenticatorsByUserId(userId) {
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         KeyConditionExpression: "#pk = :pk AND begins_with(#sk, :sk)",
         ExpressionAttributeNames: {
@@ -402,11 +410,11 @@ export function DynamoDBAdapter(
           ":pk": `USER#${userId}`,
           ":sk": "AUTHENTICATOR#",
         },
-      })
+      }))
       return (data.Items || []).map(item => format.from<AdapterAuthenticator>(item)) as AdapterAuthenticator[]
     },
     async updateAuthenticatorCounter(credentialID, counter) {
-      const data = await client.query({
+      const data = await client.send(new QueryCommand({
         TableName,
         IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -418,7 +426,7 @@ export function DynamoDBAdapter(
           ":gsi1pk": `AUTHENTICATOR#${credentialID}`,
           ":gsi1sk": `AUTHENTICATOR#${credentialID}`,
         },
-      })
+      }))
       const authenticatorRecord = data.Items?.[0]
       if (!authenticatorRecord) throw new Error(`Cannot find Authenticator with credentialID ${credentialID}`)
       const {
@@ -426,7 +434,7 @@ export function DynamoDBAdapter(
         ExpressionAttributeNames,
         ExpressionAttributeValues,
       } = generateUpdateExpression({ counter })
-      const res = await client.update({
+      const res = await client.send(new UpdateCommand({
         TableName,
         Key: {
           [pk]: authenticatorRecord[pk],
@@ -436,7 +444,7 @@ export function DynamoDBAdapter(
         ExpressionAttributeNames,
         ExpressionAttributeValues,
         ReturnValues: "ALL_NEW",
-      })
+      }))
       return format.from<AdapterAuthenticator>(res.Attributes) as AdapterAuthenticator
     },
   }

@@ -1,19 +1,18 @@
-import { DynamoDB } from "@aws-sdk/client-dynamodb"
-import { DynamoDBDocument } from "@aws-sdk/lib-dynamodb"
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb"
+import { DynamoDBDocumentClient, GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb"
 import { DynamoDBAdapter, format } from "../src"
 import { runBasicTests } from "utils/adapter"
 
 const config = {
-  endpoint: "http://127.0.0.1:8000",
-  region: "eu-central-1",
-  tls: false,
+  endpoint: "http://localhost:8000",
+  region: "us-east-1",
   credentials: {
-    accessKeyId: "foo",
-    secretAccessKey: "bar",
+    accessKeyId: "accessKey",
+    secretAccessKey: "secretKey",
   },
 }
 
-const client = DynamoDBDocument.from(new DynamoDB(config), {
+const client = DynamoDBDocumentClient.from(new DynamoDBClient(config), {
   marshallOptions: {
     convertEmptyValues: true,
     removeUndefinedValues: true,
@@ -29,18 +28,18 @@ runBasicTests({
   adapter,
   db: {
     async user(id) {
-      const user = await client.get({
+      const user = await client.send(new GetCommand({
         TableName,
         Key: {
           pk: `USER#${id}`,
           sk: `USER#${id}`,
         },
-      })
+      }))
 
       return format.from(user.Item)
     },
     async session(token) {
-      const session = await client.query({
+      const session = await client.send(new QueryCommand({
         TableName,
         IndexName: "GSI1",
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -52,12 +51,12 @@ runBasicTests({
           ":gsi1pk": `SESSION#${token}`,
           ":gsi1sk": `SESSION#${token}`,
         },
-      })
+      }))
 
       return format.from(session.Items?.[0])
     },
     async account({ provider, providerAccountId }) {
-      const account = await client.query({
+      const account = await client.send(new QueryCommand({
         TableName,
         IndexName: "GSI1",
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
@@ -69,18 +68,18 @@ runBasicTests({
           ":gsi1pk": `ACCOUNT#${provider}`,
           ":gsi1sk": `ACCOUNT#${providerAccountId}`,
         },
-      })
+      }))
 
       return format.from(account.Items?.[0])
     },
     async verificationToken({ token, identifier }) {
-      const vt = await client.get({
+      const vt = await client.send(new GetCommand({
         TableName,
         Key: {
           pk: `VT#${identifier}`,
           sk: `VT#${token}`,
         },
-      })
+      }))
       return format.from(vt.Item)
     },
   },
