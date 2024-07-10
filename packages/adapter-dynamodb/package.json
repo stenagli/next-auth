@@ -1,17 +1,17 @@
 {
   "name": "@stenagli/dynamodb-adapter",
   "repository": "https://github.com/stenagli/next-auth",
-  "version": "2.4.1-stenagli.0.1.3",
-  "description": "AWS DynamoDB adapter for next-auth.",
+  "version": "2.4.1-stenagli.1.0.0",
+  "description": "Enhanced AWS DynamoDB adapter for NextAuth.js with WebAuthn support and optimized performance.",
   "keywords": [
     "next-auth",
     "next.js",
     "oauth",
     "dynamodb"
   ],
-  "homepage": "https://authjs.dev",
+  "homepage": "https://github.com/stenagli/next-auth",
   "bugs": {
-    "url": "https://github.com/nextauthjs/next-auth/issues"
+    "url": "https://github.com/stenagli/next-auth/issues"
   },
   "private": false,
   "publishConfig": {
