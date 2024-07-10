@@ -374,7 +374,6 @@ export function DynamoDBAdapter(
         Item: format.to({
           [pk]: `USER#${userId}`,
           [sk]: `AUTHENTICATOR#${credentialID}`,
-          type: "AUTHENTICATOR",
           [GSI1PK]: `AUTHENTICATOR#${credentialID}`,
           [GSI1SK]: `AUTHENTICATOR#${credentialID}`,
           ...authenticator,

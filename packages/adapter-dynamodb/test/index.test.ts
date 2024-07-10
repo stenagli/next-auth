@@ -23,9 +23,13 @@ const client = DynamoDBDocumentClient.from(new DynamoDBClient(config), {
 const adapter = DynamoDBAdapter(client)
 
 const TableName = "next-auth"
+const IndexName = "GSI1"
+const GSI1PK = "GSI1PK"
+const GSI1SK = "GSI1SK"
 
 runBasicTests({
   adapter,
+  testWebAuthnMethods: true,
   db: {
     async user(id) {
       const user = await client.send(new GetCommand({
@@ -41,11 +45,11 @@ runBasicTests({
     async session(token) {
       const session = await client.send(new QueryCommand({
         TableName,
-        IndexName: "GSI1",
+        IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
         ExpressionAttributeNames: {
-          "#gsi1pk": "GSI1PK",
-          "#gsi1sk": "GSI1SK",
+          "#gsi1pk": GSI1PK,
+          "#gsi1sk": GSI1SK,
         },
         ExpressionAttributeValues: {
           ":gsi1pk": `SESSION#${token}`,
@@ -58,11 +62,11 @@ runBasicTests({
     async account({ provider, providerAccountId }) {
       const account = await client.send(new QueryCommand({
         TableName,
-        IndexName: "GSI1",
+        IndexName,
         KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
         ExpressionAttributeNames: {
-          "#gsi1pk": "GSI1PK",
-          "#gsi1sk": "GSI1SK",
+          "#gsi1pk": GSI1PK,
+          "#gsi1sk": GSI1SK,
         },
         ExpressionAttributeValues: {
           ":gsi1pk": `ACCOUNT#${provider}`,
@@ -81,6 +85,22 @@ runBasicTests({
         },
       }))
       return format.from(vt.Item)
+    },
+    async authenticator(credentialID) {
+      const data = await client.send(new QueryCommand({
+        TableName,
+        IndexName,
+        KeyConditionExpression: "#gsi1pk = :gsi1pk AND #gsi1sk = :gsi1sk",
+        ExpressionAttributeNames: {
+          "#gsi1pk": GSI1PK,
+          "#gsi1sk": GSI1SK,
+        },
+        ExpressionAttributeValues: {
+          ":gsi1pk": `AUTHENTICATOR#${credentialID}`,
+          ":gsi1sk": `AUTHENTICATOR#${credentialID}`,
+        },
+      }))
+      return format.from<AdapterAuthenticator>(data.Items?.[0])
     },
   },
 })
