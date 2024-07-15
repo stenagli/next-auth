@@ -34,7 +34,7 @@ npm install @stenagli/dynamodb-client
 ```
 
 ### Usage:
-In your application, you should make the following changes from the [NextAuth documentation](https://authjs.dev/getting-started/adapters/dynamodb#configuration):
+In your application, make the following changes from the [NextAuth documentation](https://authjs.dev/getting-started/adapters/dynamodb#configuration):
 
 ```diff
     import NextAuth from "next-auth"
